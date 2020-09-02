@@ -2,9 +2,18 @@ package com.example.authenticatorpoc.helpers;
 
 public final class Consts {
 
+    public static final int ANIMATION_LENGTH_MS = 600;
+
     public static final boolean DEV_MODE = true;
 
-    //Properties
+    // Authentication result enum
+    public enum AUTHENTICATION_STATE {
+        SUCCEEDED,
+        FAILED,
+        ERROR
+    }
+
+    // Properties
     public static final String Y_ROTATION_PROPERTYNAME = "rotationY";
 
 

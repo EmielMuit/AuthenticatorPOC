@@ -4,10 +4,14 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.content.ContextCompat;
 
 import android.animation.Animator;
 import android.animation.ObjectAnimator;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.TransitionDrawable;
 import android.os.Bundle;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.LinearLayout;
@@ -20,40 +24,23 @@ import java.util.concurrent.Executor;
 
 public class MainActivity extends AppCompatActivity {
 
-    private void animateLogin(final boolean aSuccess)
-    {
-        final LinearLayout loginSquare = findViewById(R.id.loginSquare);
+    // UI elements
+    ConstraintLayout rootElement;
+    LinearLayout loginSquare;
 
-        ObjectAnimator hideAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.Y_ROTATION_PROPERTYNAME, 0.0f, 90f);
-        hideAnimation.setDuration(1200);
-        hideAnimation.addListener(new Animator.AnimatorListener() {
+    // Background in between animations
+    private int currentBackground;
 
-            @Override
-            public void onAnimationStart(Animator animator) {
-            }
+    // Colors/drawables used in UI
+    private Drawable greenGradient;
+    private Drawable redGradient;
+    private int greenColor;
+    private int redColor;
+    private int resedaGreenColor;
+    private int maroonColor;
+    private int eggShellWhiteColor;
 
-            @Override
-            public void onAnimationEnd(Animator animator) {
-                //TODO restart button?
-                setupLayout(aSuccess);
-                ObjectAnimator revealAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.Y_ROTATION_PROPERTYNAME, 90f, 180f);
-                revealAnimation.setDuration(1200);
-                revealAnimation.setInterpolator(new AccelerateDecelerateInterpolator());
-                revealAnimation.start();
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animator) {
-            }
-
-            @Override
-            public void onAnimationRepeat(Animator animator) {
-            }
-        });
-        hideAnimation.setInterpolator(new AccelerateDecelerateInterpolator());
-        hideAnimation.start();
-    }
-
+    // Checks state of biometrics availability on device
     private void checkBiometricsAvailability()
     {
         //TODO recommend use of biometrics for quick access to app features when unavailable
@@ -74,17 +61,27 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        checkBiometricsAvailability();
-        setupLayout(false);
+    // Puts colors defined in xml files in fields
+    private void setUIColors() {
+        greenGradient = getResources().getDrawable(R.drawable.green_gradient);
+        redGradient = getResources().getDrawable(R.drawable.red_gradient);
+        greenColor = getResources().getColor(R.color.colorGreen);
+        redColor = getResources().getColor(R.color.colorRed);
+        resedaGreenColor = getResources().getColor(R.color.colorResedaGreen);
+        maroonColor = getResources().getColor(R.color.colorMaroon);
+        eggShellWhiteColor = getResources().getColor(R.color.colorWhiteEggshell);
 
-        setupBiometricPrompt();
+        currentBackground = ((ColorDrawable) rootElement.getBackground()).getColor();
     }
 
-    public void setupBiometricPrompt()
+    // Puts the UI elements used in code in fields
+    private void setUIElements() {
+        rootElement = findViewById(R.id.rootElement);
+        loginSquare = findViewById(R.id.loginSquare);
+    }
+
+    // Sets up the prompt to do biometrics authentication
+    private void setupBiometricPrompt()
     {
         Executor executor = ContextCompat.getMainExecutor(this);
         BiometricPrompt biometricPrompt = new BiometricPrompt(MainActivity.this,
@@ -96,6 +93,7 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(getApplicationContext(),
                         Consts.MESSAGE_AUTHENTICATION_ERROR + errString, Toast.LENGTH_SHORT)
                         .show();
+                animateLogin(Consts.AUTHENTICATION_STATE.ERROR);
             }
 
             @Override
@@ -104,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
                 super.onAuthenticationSucceeded(result);
                 Toast.makeText(getApplicationContext(),
                         Consts.MESSAGE_AUTHENTICATION_SUCCEEDED, Toast.LENGTH_SHORT).show();
-                animateLogin(true);
+                animateLogin(Consts.AUTHENTICATION_STATE.SUCCEEDED);
             }
 
             @Override
@@ -113,7 +111,7 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(getApplicationContext(), Consts.MESSAGE_AUTHENTICATION_FAILED,
                         Toast.LENGTH_SHORT)
                         .show();
-                animateLogin(false);
+                animateLogin(Consts.AUTHENTICATION_STATE.FAILED);
             }
         });
 
@@ -130,28 +128,106 @@ public class MainActivity extends AppCompatActivity {
         biometricPrompt.authenticate(promptInfo);
     }
 
-    private void setupLayout(boolean aAuthenticated)
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        setUIElements();
+
+        setUIColors();
+
+        checkBiometricsAvailability();
+
+        // On initialization error state is sent to display neutral background, with red square
+        // Reason: In XML we cannot set square color based on Android version
+        setupLayoutOnAuthentication(Consts.AUTHENTICATION_STATE.ERROR);
+
+        setupBiometricPrompt();
+    }
+
+    private void animateLogin(final Consts.AUTHENTICATION_STATE aSuccess)
     {
-        LinearLayout loginSquare = findViewById(R.id.loginSquare);
-        if (aAuthenticated)
-        {
-            if (android.os.Build.VERSION.SDK_INT >= 16) {
-                loginSquare.setBackground(getResources().getDrawable(R.drawable.green_gradient));
+        // Square disappears by rotating Y axis 90 degrees and color changes on animation end
+        ObjectAnimator hideAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.Y_ROTATION_PROPERTYNAME, 0.0f, 90f);
+        hideAnimation.setDuration(Consts.ANIMATION_LENGTH_MS);
+        hideAnimation.addListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationStart(Animator animator) {}
+
+            @Override
+            public void onAnimationEnd(Animator animator) {
+                //TODO restart button?
+
+                // Sets the colors based on authentication state
+                setupLayoutOnAuthentication(aSuccess);
+
+                // Square appears with updated colors
+                ObjectAnimator revealAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.Y_ROTATION_PROPERTYNAME, 90f, 180f);
+                revealAnimation.setDuration(Consts.ANIMATION_LENGTH_MS);
+                revealAnimation.setInterpolator(new AccelerateDecelerateInterpolator());
+                revealAnimation.start();
             }
-            else
+
+            @Override
+            public void onAnimationCancel(Animator animator) {}
+
+            @Override
+            public void onAnimationRepeat(Animator animator) {}
+        });
+        hideAnimation.setInterpolator(new AccelerateDecelerateInterpolator());
+        hideAnimation.start();
+    }
+
+    // Updates the UI colors based on the authentication state
+    // Square will use gradients when supported by Android version
+    private void setupLayoutOnAuthentication(Consts.AUTHENTICATION_STATE aState)
+    {
+        // Colors used in background color transition
+        ColorDrawable[] colorTransition = new ColorDrawable[2];
+        // Transition starts with current background color
+        colorTransition[0] = new ColorDrawable(currentBackground);
+
+        switch (aState) {
+            case SUCCEEDED:
             {
-                loginSquare.setBackgroundColor(getResources().getColor(R.color.colorGreen));
+                colorTransition[1] = new ColorDrawable(resedaGreenColor);
+                if (android.os.Build.VERSION.SDK_INT >= 16) {
+                    loginSquare.setBackground(greenGradient);
+                } else {
+                    loginSquare.setBackgroundColor(greenColor);
+                }
+                break;
+            }
+            case FAILED:
+            {
+                colorTransition[1] = new ColorDrawable(maroonColor);
+                if (android.os.Build.VERSION.SDK_INT >= 16) {
+                    loginSquare.setBackground(redGradient);
+                } else {
+                    loginSquare.setBackgroundColor(redColor);
+                }
+                break;
+            }
+            case ERROR:
+            {
+                colorTransition[1] = new ColorDrawable(eggShellWhiteColor);
+                if (android.os.Build.VERSION.SDK_INT >= 16) {
+                    loginSquare.setBackground(redGradient);
+                } else {
+                    loginSquare.setBackgroundColor(redColor);
+                }
+                break;
             }
         }
-        else
-        {
-            if (android.os.Build.VERSION.SDK_INT >= 16) {
-                loginSquare.setBackground(getResources().getDrawable(R.drawable.red_gradient));
-            }
-            else
-            {
-                loginSquare.setBackgroundColor(getResources().getColor(R.color.colorRed));
-            }
-        }
+
+        // transitions background color to color set in switch above
+        TransitionDrawable trans = new TransitionDrawable(colorTransition);
+        // currentBackground becomes color transitioned to above
+        currentBackground = colorTransition[1].getColor();
+
+        //This will work also on old devices. The latest API says you have to use setBackground instead.
+        rootElement.setBackgroundDrawable(trans);
+        trans.startTransition(Consts.ANIMATION_LENGTH_MS);
     }
 }

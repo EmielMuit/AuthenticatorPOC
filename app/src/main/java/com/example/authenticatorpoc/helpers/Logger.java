@@ -4,6 +4,7 @@ import android.util.Log;
 
 public final class Logger {
 
+    // When DEV_MODE boolean is set to true, prints debug logging
     public static void debug(String aTag, String aLine) {
         if (Consts.DEV_MODE) {
             StackTraceElement[] e = Thread.currentThread().getStackTrace();
