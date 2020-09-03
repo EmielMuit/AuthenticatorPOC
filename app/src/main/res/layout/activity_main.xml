@@ -6,7 +6,23 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity"
     android:id="@+id/rootElement"
-    android:background="@color/colorWhiteEggshell">
+    android:background="@color/colorWhiteEggshell"
+    android:animateLayoutChanges="true">
+
+    <Button
+        android:id="@+id/btReset"
+        android:background="@drawable/button_shape"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintWidth_percent="0.2"
+        app:layout_constraintHeight_percent="0.1"
+        android:onClick="Reset"
+        android:text="@string/bt_reset_text"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <LinearLayout
         android:id="@+id/loginSquare"

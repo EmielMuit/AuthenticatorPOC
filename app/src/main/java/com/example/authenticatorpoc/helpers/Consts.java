@@ -10,7 +10,8 @@ public final class Consts {
     public enum AUTHENTICATION_STATE {
         SUCCEEDED,
         FAILED,
-        ERROR
+        ERROR,
+        RESET
     }
 
     // Properties

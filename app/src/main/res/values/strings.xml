@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AuthenticatorPOC</string>
+    <string name="bt_reset_text">Reset app</string>
 </resources>

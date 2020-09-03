@@ -13,7 +13,10 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.TransitionDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.view.View;
 import android.view.animation.AccelerateDecelerateInterpolator;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
@@ -24,31 +27,34 @@ import java.util.concurrent.Executor;
 
 public class MainActivity extends AppCompatActivity {
 
-    // UI elements
+    // UI elements, prevent repeated calls to find by id
     ConstraintLayout rootElement;
     LinearLayout loginSquare;
+    Button btReset;
 
-    // Background in between animations
+    // UI values
+    boolean squareFlipped = false;
+    Consts.AUTHENTICATION_STATE previousAuthenticationResult;
+
+    // current background color
     private int currentBackground;
 
     // Colors/drawables used in UI
     private Drawable greenGradient;
     private Drawable redGradient;
-    private int greenColor;
-    private int redColor;
     private int resedaGreenColor;
     private int maroonColor;
     private int eggShellWhiteColor;
 
     // Checks state of biometrics availability on device
-    private void checkBiometricsAvailability()
+    private boolean checkBiometricsAvailability()
     {
         //TODO recommend use of biometrics for quick access to app features when unavailable
         BiometricManager biometricManager = BiometricManager.from(this);
         switch (biometricManager.canAuthenticate()) {
             case BiometricManager.BIOMETRIC_SUCCESS:
                 Logger.debug(Consts.TAG_AUTHENTICATION_ACTIVITY, Consts.LOG_BIOMETRICS_AVAILABLE);
-                break;
+                return true;
             case BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE:
                 Logger.debug(Consts.TAG_AUTHENTICATION_ACTIVITY, Consts.LOG_BIOMETRICS_UNAVAILABLE);
                 break;
@@ -59,14 +65,13 @@ public class MainActivity extends AppCompatActivity {
                 Logger.debug(Consts.TAG_AUTHENTICATION_ACTIVITY, Consts.LOG_BIOMETRICS_NOT_SETUP);
                 break;
         }
+        return false;
     }
 
     // Puts colors defined in xml files in fields
     private void setUIColors() {
         greenGradient = getResources().getDrawable(R.drawable.green_gradient);
         redGradient = getResources().getDrawable(R.drawable.red_gradient);
-        greenColor = getResources().getColor(R.color.colorGreen);
-        redColor = getResources().getColor(R.color.colorRed);
         resedaGreenColor = getResources().getColor(R.color.colorResedaGreen);
         maroonColor = getResources().getColor(R.color.colorMaroon);
         eggShellWhiteColor = getResources().getColor(R.color.colorWhiteEggshell);
@@ -78,6 +83,7 @@ public class MainActivity extends AppCompatActivity {
     private void setUIElements() {
         rootElement = findViewById(R.id.rootElement);
         loginSquare = findViewById(R.id.loginSquare);
+        btReset = (Button) findViewById(R.id.btReset);
     }
 
     // Sets up the prompt to do biometrics authentication
@@ -90,10 +96,29 @@ public class MainActivity extends AppCompatActivity {
             public void onAuthenticationError(int errorCode,
                                               @NonNull CharSequence errString) {
                 super.onAuthenticationError(errorCode, errString);
-                Toast.makeText(getApplicationContext(),
-                        Consts.MESSAGE_AUTHENTICATION_ERROR + errString, Toast.LENGTH_SHORT)
-                        .show();
-                animateLogin(Consts.AUTHENTICATION_STATE.ERROR);
+                // errorCode 5 means operation was 'canceled'
+                // - Somehow on my Samsung device the biometric dialogue immediately disappears
+                // - and returns a callback with errorCode 5. If/Else is to prevent loops of dialogues
+                // errorCode 13 means negative button was pressed
+                // - When the user presses cancel, wait a second, then show the biometric dialogue again
+                if (errorCode != 5 && errorCode != 13) {
+                    Toast.makeText(getApplicationContext(),
+                            Consts.MESSAGE_AUTHENTICATION_ERROR + errString, Toast.LENGTH_SHORT)
+                            .show();
+                    animateLogin(Consts.AUTHENTICATION_STATE.ERROR);
+                }
+                else
+                {
+                    if (errorCode != 5) {
+                        Handler handler = new Handler();
+                        handler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                setupBiometricPrompt();
+                            }
+                        }, 1000);
+                    }
+                }
             }
 
             @Override
@@ -115,11 +140,11 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
-                .setTitle(Consts.PROMPT_TITLE)
-                .setSubtitle(Consts.PROMPT_SUBTITLE)
-                .setNegativeButtonText(" ") //TODO use negative button?
-                .build();
+        BiometricPrompt.PromptInfo.Builder builder = new BiometricPrompt.PromptInfo.Builder();
+        builder.setTitle(Consts.PROMPT_TITLE);
+        builder.setSubtitle(Consts.PROMPT_SUBTITLE);
+        builder.setNegativeButtonText("Cancel");
+        BiometricPrompt.PromptInfo promptInfo = builder.build();
 
         // Prompt appears on startup.
         // Consider integrating with the keystore to unlock cryptographic operations,
@@ -139,17 +164,20 @@ public class MainActivity extends AppCompatActivity {
 
         checkBiometricsAvailability();
 
-        // On initialization error state is sent to display neutral background, with red square
-        // Reason: In XML we cannot set square color based on Android version
-        setupLayoutOnAuthentication(Consts.AUTHENTICATION_STATE.ERROR);
-
-        setupBiometricPrompt();
+        // On initialization reset state is sent to display neutral background, with red square
+        // This also (re)triggers biometric prompts
+        setupLayoutOnAuthentication(Consts.AUTHENTICATION_STATE.RESET);
     }
 
     private void animateLogin(final Consts.AUTHENTICATION_STATE aSuccess)
     {
+        // We need to know if the square has been flipped, otherwise the gradient will suddenly
+        // be mirrored on screen after the flip animation
+        final float currentAngle = squareFlipped ?180f:0.0f;
+        squareFlipped = !squareFlipped;
+
         // Square disappears by rotating Y axis 90 degrees and color changes on animation end
-        ObjectAnimator hideAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.Y_ROTATION_PROPERTYNAME, 0.0f, 90f);
+        ObjectAnimator hideAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.Y_ROTATION_PROPERTYNAME, currentAngle+0.0f, currentAngle+90f);
         hideAnimation.setDuration(Consts.ANIMATION_LENGTH_MS);
         hideAnimation.addListener(new Animator.AnimatorListener() {
             @Override
@@ -157,13 +185,11 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onAnimationEnd(Animator animator) {
-                //TODO restart button?
-
                 // Sets the colors based on authentication state
                 setupLayoutOnAuthentication(aSuccess);
 
                 // Square appears with updated colors
-                ObjectAnimator revealAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.Y_ROTATION_PROPERTYNAME, 90f, 180f);
+                ObjectAnimator revealAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.Y_ROTATION_PROPERTYNAME, currentAngle+90f, currentAngle+180f);
                 revealAnimation.setDuration(Consts.ANIMATION_LENGTH_MS);
                 revealAnimation.setInterpolator(new AccelerateDecelerateInterpolator());
                 revealAnimation.start();
@@ -192,31 +218,42 @@ public class MainActivity extends AppCompatActivity {
             case SUCCEEDED:
             {
                 colorTransition[1] = new ColorDrawable(resedaGreenColor);
-                if (android.os.Build.VERSION.SDK_INT >= 16) {
-                    loginSquare.setBackground(greenGradient);
-                } else {
-                    loginSquare.setBackgroundColor(greenColor);
-                }
+                loginSquare.setBackground(greenGradient);
+                setResetButtonVisibility(true);
                 break;
             }
             case FAILED:
             {
                 colorTransition[1] = new ColorDrawable(maroonColor);
-                if (android.os.Build.VERSION.SDK_INT >= 16) {
-                    loginSquare.setBackground(redGradient);
-                } else {
-                    loginSquare.setBackgroundColor(redColor);
-                }
+                loginSquare.setBackground(redGradient);
                 break;
             }
             case ERROR:
             {
                 colorTransition[1] = new ColorDrawable(eggShellWhiteColor);
-                if (android.os.Build.VERSION.SDK_INT >= 16) {
-                    loginSquare.setBackground(redGradient);
-                } else {
-                    loginSquare.setBackgroundColor(redColor);
-                }
+                loginSquare.setBackground(redGradient);
+                final Handler handler = new Handler();
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        setResetButtonVisibility(true);
+                    }
+                }, 30000);
+                break;
+            }
+            case RESET:
+            {
+                colorTransition[1] = new ColorDrawable(eggShellWhiteColor);
+                loginSquare.setBackground(redGradient);
+                Logger.debug(Consts.TAG_AUTHENTICATION_ACTIVITY, "Biometrics available? " + String.valueOf(checkBiometricsAvailability()));
+
+                final Handler handler = new Handler();
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        setupBiometricPrompt();
+                    }
+                }, 1000);
                 break;
             }
         }
@@ -226,8 +263,35 @@ public class MainActivity extends AppCompatActivity {
         // currentBackground becomes color transitioned to above
         currentBackground = colorTransition[1].getColor();
 
-        //This will work also on old devices. The latest API says you have to use setBackground instead.
         rootElement.setBackgroundDrawable(trans);
         trans.startTransition(Consts.ANIMATION_LENGTH_MS);
+
+        previousAuthenticationResult = aState;
+    }
+
+    public void Reset(View v)
+    {
+        setResetButtonVisibility(false);
+        animateLogin(Consts.AUTHENTICATION_STATE.RESET);
+    }
+
+    public void setResetButtonVisibility(boolean aVisible)
+    {
+        if (aVisible)
+        {
+            btReset.setAlpha(0.0f);
+            btReset.setVisibility(View.VISIBLE);
+            btReset.animate().alpha(1f);
+        }
+        else
+        {
+            btReset.setAlpha(1.0f);
+            btReset.animate().alpha(0.0f).withEndAction(new Runnable() {
+                @Override
+                public void run() {
+                    btReset.setVisibility(View.INVISIBLE);
+                }
+            });
+        }
     }
 }
