@@ -1,4 +1,4 @@
-package com.example.authenticatorpoc.helpers;
+package com.example.authenticatorpoc.helper;
 
 import android.util.Log;
 

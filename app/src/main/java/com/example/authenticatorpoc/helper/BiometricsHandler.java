@@ -1,36 +1,42 @@
-package com.example.authenticatorpoc.helpers;
+package com.example.authenticatorpoc.helper;
 
 import android.app.Activity;
+
 import android.os.Handler;
+
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
+
 import androidx.core.content.ContextCompat;
+
 import androidx.fragment.app.FragmentActivity;
 
 import com.example.authenticatorpoc.constants.AUTHENTICATION_STATE;
 import com.example.authenticatorpoc.constants.Consts;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executor;
 
 import static androidx.biometric.BiometricConstants.ERROR_CANCELED;
 import static androidx.biometric.BiometricConstants.ERROR_NEGATIVE_BUTTON;
 
-public class BiometricsHandler {
+public final class BiometricsHandler {
 
-    private static Activity activity = null;
+    private final static List<IBiometricsPromptListener> listeners = new ArrayList<>();
 
-    private static BiometricsHandler biometricsHandlerInstance = null;
-
-    private BiometricsHandler() {}
+    public static void addAuthenticationResultListener(IBiometricsPromptListener aListener) {
+        listeners.add(aListener);
+    }
 
     // Checks state of biometrics availability on device
-    public boolean checkBiometricsAvailability()
-    {
+    public static boolean checkBiometricsAvailability(Activity aActivity) {
         //TODO recommend use of biometrics for quick access to app features when unavailable
-        BiometricManager biometricManager = BiometricManager.from(activity);
+        BiometricManager biometricManager = BiometricManager.from(aActivity);
         switch (biometricManager.canAuthenticate()) {
             case BiometricManager.BIOMETRIC_SUCCESS:
                 Logger.debug(Consts.LOG_TAG_AUTHENTICATION_ACTIVITY, Consts.LOG_BIOMETRICS_AVAILABLE);
@@ -51,10 +57,9 @@ public class BiometricsHandler {
     // Sets up and displays the prompt to do biometrics authentication
     // By using Androidx biometrics we ensure compatibility down to Marshmallow, as well
     // as allowing the device to decide which biometrics authentication method to use.
-    public void setupBiometricPrompt(final IBiometricsPromptCallback authenticationCallback, final String aTitle, final String aSubtitle)
-    {
-        Executor executor = ContextCompat.getMainExecutor(activity);
-        BiometricPrompt biometricPrompt = new BiometricPrompt((FragmentActivity) activity,
+    public static void setupBiometricPrompt(final String aTitle, final String aSubtitle, final Activity aActivity) {
+        Executor executor = ContextCompat.getMainExecutor(aActivity);
+        BiometricPrompt biometricPrompt = new BiometricPrompt((FragmentActivity) aActivity,
                 executor, new BiometricPrompt.AuthenticationCallback() {
 
             // Errors may occur among others when a user is locked out, or presses cancel
@@ -69,19 +74,20 @@ public class BiometricsHandler {
                 // - When the user presses cancel, wait a second, then show the biometric dialogue again
                 // Refer to BiometricPrompt.java for more information
                 if (errorCode != ERROR_CANCELED && errorCode != ERROR_NEGATIVE_BUTTON) {
-                    Toast.makeText(activity,
+                    Toast.makeText(aActivity,
                             Consts.TOAST_MESSAGE_AUTHENTICATION_ERROR + errString, Toast.LENGTH_SHORT)
                             .show();
-                    authenticationCallback.onAuthenticationResult(AUTHENTICATION_STATE.ERROR);
-                }
-                else
-                {
+                    Toast.makeText(aActivity, Consts.TOAST_MESSAGE_LOCKED_OUT, Toast.LENGTH_SHORT).show();
+                    for (IBiometricsPromptListener listener : listeners) {
+                        listener.onAuthenticationResult(AUTHENTICATION_STATE.ERROR);
+                    }
+                } else {
                     if (errorCode != ERROR_CANCELED) {
                         Handler handler = new Handler();
                         handler.postDelayed(new Runnable() {
                             @Override
                             public void run() {
-                                setupBiometricPrompt(authenticationCallback, aTitle, aSubtitle);
+                                setupBiometricPrompt(aTitle, aSubtitle, aActivity);
                             }
                         }, Consts.ONE_SECOND_IN_MILLIS);
                     }
@@ -93,19 +99,23 @@ public class BiometricsHandler {
             public void onAuthenticationSucceeded(
                     @NonNull BiometricPrompt.AuthenticationResult result) {
                 super.onAuthenticationSucceeded(result);
-                Toast.makeText(activity,
+                Toast.makeText(aActivity,
                         Consts.TOAST_MESSAGE_AUTHENTICATION_SUCCEEDED, Toast.LENGTH_SHORT).show();
-                authenticationCallback.onAuthenticationResult(AUTHENTICATION_STATE.SUCCEEDED);
+                for (IBiometricsPromptListener listener : listeners) {
+                    listener.onAuthenticationResult(AUTHENTICATION_STATE.SUCCEEDED);
+                }
             }
 
             // Authentication fails when the fingerprint does not match those stored by device
             @Override
             public void onAuthenticationFailed() {
                 super.onAuthenticationFailed();
-                Toast.makeText(activity, Consts.TOAST_MESSAGE_AUTHENTICATION_FAILED,
+                Toast.makeText(aActivity, Consts.TOAST_MESSAGE_AUTHENTICATION_FAILED,
                         Toast.LENGTH_SHORT)
                         .show();
-                authenticationCallback.onAuthenticationResult(AUTHENTICATION_STATE.FAILED);
+                for (IBiometricsPromptListener listener : listeners) {
+                    listener.onAuthenticationResult(AUTHENTICATION_STATE.FAILED);
+                }
             }
         });
 
@@ -122,14 +132,5 @@ public class BiometricsHandler {
         biometricPrompt.authenticate(promptInfo);
     }
 
-    // A BiometricsHandler instance may be used in several activities
-    public static BiometricsHandler getBiometricsHandlerInstance(Activity aForActivity)
-    {
-        activity = aForActivity;
-        if (biometricsHandlerInstance == null)
-        {
-            biometricsHandlerInstance = new BiometricsHandler();
-        }
-        return biometricsHandlerInstance;
-    }
+
 }
