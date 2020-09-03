@@ -2,6 +2,8 @@ package com.example.authenticatorpoc.helpers;
 
 import android.util.Log;
 
+import com.example.authenticatorpoc.constants.Consts;
+
 public final class Logger {
 
     // When DEV_MODE boolean is set to true, prints debug logging

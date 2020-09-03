@@ -1,5 +1,8 @@
 package com.example.authenticatorpoc.helpers;
 
+import com.example.authenticatorpoc.constants.AUTHENTICATION_STATE;
+
 public interface IBiometricsPromptCallback {
-    public void handleAuthenticationResult(Consts.AUTHENTICATION_STATE aState);
+    // Action to perform when authentication is finished
+    public void onAuthenticationResult(AUTHENTICATION_STATE aState);
 }

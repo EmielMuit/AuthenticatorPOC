@@ -15,10 +15,10 @@ import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
+import com.example.authenticatorpoc.constants.AUTHENTICATION_STATE;
 import com.example.authenticatorpoc.helpers.BiometricsHandler;
-import com.example.authenticatorpoc.helpers.Consts;
+import com.example.authenticatorpoc.constants.Consts;
 import com.example.authenticatorpoc.helpers.IBiometricsPromptCallback;
-import com.example.authenticatorpoc.helpers.Logger;
 
 public class MainActivity extends AppCompatActivity implements IBiometricsPromptCallback {
 
@@ -29,7 +29,7 @@ public class MainActivity extends AppCompatActivity implements IBiometricsPrompt
 
     // UI values
     boolean squareFlipped = false;
-    Consts.AUTHENTICATION_STATE previousAuthenticationResult;
+    AUTHENTICATION_STATE previousAuthenticationResult;
 
     // current background color
     private int currentBackground;
@@ -75,7 +75,7 @@ public class MainActivity extends AppCompatActivity implements IBiometricsPrompt
         showBiometricsPrompt();
     }
 
-    private void animateLogin(final Consts.AUTHENTICATION_STATE aSuccess)
+    private void animateLogin(final AUTHENTICATION_STATE aSuccess)
     {
         // We need to know if the square has been flipped, otherwise the gradient will suddenly
         // be mirrored on screen after the flip animation
@@ -83,29 +83,23 @@ public class MainActivity extends AppCompatActivity implements IBiometricsPrompt
         squareFlipped = !squareFlipped;
 
         // Square disappears by rotating Y axis 90 degrees and color changes on animation end
-        ObjectAnimator hideAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.Y_ROTATION_PROPERTYNAME, currentAngle+0.0f, currentAngle+90f);
+        ObjectAnimator hideAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.PROPERTY_Y_ROTATION, currentAngle+0.0f, currentAngle+90f);
         hideAnimation.setDuration(Consts.ANIMATION_LENGTH_MS);
         hideAnimation.addListener(new Animator.AnimatorListener() {
-            @Override
-            public void onAnimationStart(Animator animator) {}
-
+            @Override public void onAnimationStart(Animator animator) {} // No action on start
             @Override
             public void onAnimationEnd(Animator animator) {
                 // Sets the colors based on authentication state
                 setupLayoutOnAuthentication(aSuccess);
 
                 // Square appears with updated colors
-                ObjectAnimator revealAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.Y_ROTATION_PROPERTYNAME, currentAngle+90f, currentAngle+180f);
+                ObjectAnimator revealAnimation = ObjectAnimator.ofFloat(loginSquare, Consts.PROPERTY_Y_ROTATION, currentAngle+90f, currentAngle+180f);
                 revealAnimation.setDuration(Consts.ANIMATION_LENGTH_MS);
                 revealAnimation.setInterpolator(new AccelerateDecelerateInterpolator());
                 revealAnimation.start();
             }
-
-            @Override
-            public void onAnimationCancel(Animator animator) {}
-
-            @Override
-            public void onAnimationRepeat(Animator animator) {}
+            @Override public void onAnimationCancel(Animator animator) {} // No action on cancel
+            @Override public void onAnimationRepeat(Animator animator) {} // No action on repeat
         });
         hideAnimation.setInterpolator(new AccelerateDecelerateInterpolator());
         hideAnimation.start();
@@ -113,11 +107,11 @@ public class MainActivity extends AppCompatActivity implements IBiometricsPrompt
 
     // Updates the UI colors based on the authentication state
     // Square will use gradients when supported by Android version
-    private void setupLayoutOnAuthentication(Consts.AUTHENTICATION_STATE aState)
+    private void setupLayoutOnAuthentication(AUTHENTICATION_STATE aState)
     {
         // Colors used in background color transition
         ColorDrawable[] colorTransition = new ColorDrawable[2];
-        // Transition starts with current background color
+        // colorTransition[0] = FROM, colorTransition[1] = TO color
         colorTransition[0] = new ColorDrawable(currentBackground);
 
         switch (aState) {
@@ -144,14 +138,13 @@ public class MainActivity extends AppCompatActivity implements IBiometricsPrompt
                     public void run() {
                         setResetButtonVisibility(true);
                     }
-                }, 30000);
+                }, Consts.FINGERPRINT_LOCKED_TIME_IN_MILLIS);
                 break;
             }
             case RESET:
             {
                 colorTransition[1] = new ColorDrawable(eggShellWhiteColor);
                 loginSquare.setBackground(redGradient);
-                Logger.debug(Consts.TAG_AUTHENTICATION_ACTIVITY, "Biometrics available? " + String.valueOf(BiometricsHandler.getBiometricsHandlerInstance(this).checkBiometricsAvailability()));
                 showBiometricsPrompt();
                 break;
             }
@@ -159,33 +152,35 @@ public class MainActivity extends AppCompatActivity implements IBiometricsPrompt
 
         // transitions background color to color set in switch above
         TransitionDrawable trans = new TransitionDrawable(colorTransition);
-        // currentBackground becomes color transitioned to above
+
+        // currentBackground is stored for future transitions
         currentBackground = colorTransition[1].getColor();
 
+        // transition starts
         rootElement.setBackgroundDrawable(trans);
         trans.startTransition(Consts.ANIMATION_LENGTH_MS);
-
-        previousAuthenticationResult = aState;
     }
 
+    // Restart the authentication, called from XML, hence parameter v
     public void Reset(View v)
     {
         setResetButtonVisibility(false);
-        animateLogin(Consts.AUTHENTICATION_STATE.RESET);
+        animateLogin(AUTHENTICATION_STATE.RESET);
     }
 
+    // Set reset button visibility, with animations!
     public void setResetButtonVisibility(boolean aVisible)
     {
         if (aVisible)
         {
-            btReset.setAlpha(0.0f);
+            btReset.setAlpha(Consts.TRANSPARENT_ALPHA_VALUE);
             btReset.setVisibility(View.VISIBLE);
-            btReset.animate().alpha(1f);
+            btReset.animate().alpha(Consts.OPAQUE_ALPHA_VALUE);
         }
         else
         {
-            btReset.setAlpha(1.0f);
-            btReset.animate().alpha(0.0f).withEndAction(new Runnable() {
+            btReset.setAlpha(Consts.OPAQUE_ALPHA_VALUE);
+            btReset.animate().alpha(Consts.TRANSPARENT_ALPHA_VALUE).withEndAction(new Runnable() {
                 @Override
                 public void run() {
                     btReset.setVisibility(View.INVISIBLE);
@@ -194,19 +189,21 @@ public class MainActivity extends AppCompatActivity implements IBiometricsPrompt
         }
     }
 
+    // Sets up a biometrics prompt for current activity
     public void showBiometricsPrompt()
     {
         final Handler handler = new Handler();
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                BiometricsHandler.getBiometricsHandlerInstance(MainActivity.this).setupBiometricPrompt(MainActivity.this);
+                BiometricsHandler.getBiometricsHandlerInstance(MainActivity.this).setupBiometricPrompt(MainActivity.this, Consts.BIOMETRICS_PROMPT_TITLE, Consts.BIOMETRICS_PROMPT_SUBTITLE);
             }
-        }, 1000);
+        }, Consts.ONE_SECOND_IN_MILLIS);
     }
 
+    // Starts animation after authentication result is received
     @Override
-    public void handleAuthenticationResult(Consts.AUTHENTICATION_STATE aState) {
+    public void onAuthenticationResult(AUTHENTICATION_STATE aState) {
         animateLogin(aState);
     }
 }
