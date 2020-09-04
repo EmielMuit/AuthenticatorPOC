@@ -1,11 +1,12 @@
 package com.example.authenticatorpoc.controller;
 
 import com.example.authenticatorpoc.activity.IAuthenticationControllerListener;
+import com.example.authenticatorpoc.activity.IShowBiometricsPromptListener;
 import com.example.authenticatorpoc.constants.AUTHENTICATION_STATE;
 import com.example.authenticatorpoc.helper.IBiometricsPromptListener;
 import com.example.authenticatorpoc.view.AuthenticationView;
 
-public class AuthenticationController implements IBiometricsPromptListener {
+public class AuthenticationController implements IBiometricsPromptListener, IShowBiometricsPromptListener {
 
     private final AuthenticationView authenticationView;
     private final IAuthenticationControllerListener listener;
@@ -34,5 +35,10 @@ public class AuthenticationController implements IBiometricsPromptListener {
                 break;
             }
         }
+    }
+
+    @Override
+    public void showPrompt() {
+        listener.onResetApp();
     }
 }

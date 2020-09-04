@@ -20,6 +20,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 
 import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.core.content.res.ResourcesCompat;
 
 import com.example.authenticatorpoc.activity.IShowBiometricsPromptListener;
 import com.example.authenticatorpoc.constants.AUTHENTICATION_STATE;
@@ -49,11 +50,11 @@ public class AuthenticationView extends ConstraintLayout {
 
     // Puts colors defined in xml files in fields
     private void setUIColors() {
-        greenGradient = getResources().getDrawable(R.drawable.green_gradient);
-        redGradient = getResources().getDrawable(R.drawable.red_gradient);
-        resedaGreenColor = getResources().getColor(R.color.colorResedaGreen);
-        maroonColor = getResources().getColor(R.color.colorMaroon);
-        eggShellWhiteColor = getResources().getColor(R.color.colorWhiteEggshell);
+        greenGradient = ResourcesCompat.getDrawable(getResources(), R.drawable.green_gradient, null);
+        redGradient = ResourcesCompat.getDrawable(getResources(), R.drawable.red_gradient, null);
+        resedaGreenColor = ResourcesCompat.getColor(getResources(), R.color.colorResedaGreen, null);
+        maroonColor = ResourcesCompat.getColor(getResources(), R.color.colorMaroon, null);
+        eggShellWhiteColor = ResourcesCompat.getColor(getResources(), R.color.colorWhiteEggshell, null);
 
         currentBackground = ((ColorDrawable) authenticationView.getBackground()).getColor();
     }
@@ -158,7 +159,7 @@ public class AuthenticationView extends ConstraintLayout {
         currentBackground = aColorTransition[1].getColor();
 
         // transition starts
-        authenticationView.setBackgroundDrawable(trans);
+        authenticationView.setBackground(trans);
         trans.startTransition(Consts.ANIMATION_LENGTH_MS);
     }
 

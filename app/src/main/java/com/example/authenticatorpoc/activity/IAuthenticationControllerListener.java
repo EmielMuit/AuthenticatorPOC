@@ -6,4 +6,6 @@ public interface IAuthenticationControllerListener {
     void onAuthenticationFailure();
 
     void onAuthenticationError();
+
+    void onResetApp();
 }
